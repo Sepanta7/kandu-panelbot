@@ -2,15 +2,10 @@
 require_once 'baseinfo.php';
 
 $apiUrl = "https://api.telegram.org/bot$botToken/";
-$dataDir = __DIR__ . '/data';
-$banFile = $dataDir . '/ban_users.txt';
 
-if (!file_exists($dataDir)) {
-    mkdir($dataDir, 0777, true);
-}
-
-if (!file_exists($banFile)) {
-    file_put_contents($banFile, "");
+$conn = new mysqli($servername, $username, $password, $dbname);
+if ($conn->connect_error) {
+    die("اتصال به دیتابیس با خطا مواجه شد: " . $conn->connect_error);
 }
 
 $update = file_get_contents("php://input");
@@ -20,31 +15,40 @@ $chatId = $update['message']['chat']['id'] ?? $update['callback_query']['message
 $message = $update['message']['text'] ?? '';
 $callbackData = $update['callback_query']['data'] ?? '';
 
-function getBlockedUsers($banFile) {
-    $users = file($banFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    return $users ? $users : [];
-}
-
-function blockUser($userId, $banFile) {
-    $blockedUsers = getBlockedUsers($banFile);
-    if (!in_array($userId, $blockedUsers)) {
-        file_put_contents($banFile, $userId . PHP_EOL, FILE_APPEND);
+// تابع برای دریافت لیست کاربران مسدود شده از دیتابیس
+function getBlockedUsers($conn) {
+    $sql = "SELECT chatid FROM black_list";
+    $result = $conn->query($sql);
+    $users = [];
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $users[] = $row['chatid'];
+        }
     }
+    return $users;
 }
 
-function unblockUser($userId, $banFile) {
-    $blockedUsers = getBlockedUsers($banFile);
-    if (in_array($userId, $blockedUsers)) {
-        $updatedUsers = array_diff($blockedUsers, [$userId]);
-        file_put_contents($banFile, implode(PHP_EOL, $updatedUsers) . PHP_EOL);
-    }
+// تابع برای مسدود کردن کاربر و اضافه کردن به جدول black_list
+function blockUser($userId, $conn) {
+    $sql = "INSERT IGNORE INTO black_list (chatid) VALUES (?)";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+    $stmt->close();
 }
 
-$blockedUsers = getBlockedUsers($banFile);
+// تابع برای رفع مسدودی کاربر از جدول black_list
+function unblockUser($userId, $conn) {
+    $sql = "DELETE FROM black_list WHERE chatid = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+    $stmt->close();
+}
+
+$blockedUsers = getBlockedUsers($conn);
 
 if ($message == "/start" && !in_array($chatId, $blockedUsers)) {
-    $text = "سلام! خوش اومدی به ربات ما! 😊\n\nامیدوارم از استفاده از ربات لذت ببری. لطفاً یکی از گزینه‌های زیر رو انتخاب کن:";
-
     $keyboard = [
         'inline_keyboard' => [
             [['text' => 'دکمه 1', 'callback_data' => 'button1']],
@@ -60,15 +64,17 @@ if ($message == "/start" && !in_array($chatId, $blockedUsers)) {
 
     $replyMarkup = json_encode($keyboard);
 
-    file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode($text) . "&reply_markup=$replyMarkup");
+    file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("سلام! خوش اومدی به ربات ما! 😊") . "&reply_markup=$replyMarkup");
 
 } elseif ($callbackData == "admin_panel" && $chatId == $adminId) {
-    $editText = "عزیزم به پنل ادمین خوش اومدی گلم 😊\n\nراستی اگه از ربات راضی هستی بیا داخل کانال سازندم جوین شو لطفا تا بتونی آپدیت‌ها رو انجام بدی!\n@kandu_ch";
+    $editText = "عزیزم به پنل ادمین خوش اومدی 😊";
 
     $keyboard = [
         'inline_keyboard' => [
-            [['text' => '❌مسدود کردن کاربر❌', 'callback_data' => 'block_user']],
-            [['text' => '✅رفع مسدودی کاربر✅', 'callback_data' => 'unblock_user']]
+            [
+                ['text' => '❌مسدود کردن کاربر❌', 'callback_data' => 'block_user'],
+                ['text' => '✅رفع مسدودی کاربر✅', 'callback_data' => 'unblock_user']
+            ]
         ]
     ];
 
@@ -79,51 +85,20 @@ if ($message == "/start" && !in_array($chatId, $blockedUsers)) {
     file_get_contents($apiUrl . "editMessageText?chat_id=$chatId&message_id=$messageId&text=" . urlencode($editText) . "&reply_markup=$replyMarkup");
 
 } elseif ($callbackData == "block_user" && $chatId == $adminId) {
-    file_put_contents("$dataDir/is_blocking.txt", "1");
     file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("لطفاً آیدی عددی کاربر را ارسال کنید:"));
-
-} elseif (file_exists("$dataDir/is_blocking.txt") && $chatId == $adminId) {
-    $userIdToBlock = $message;
-
-    if ($userIdToBlock == $adminId) {
-        file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("خودت میخوای خودتو بن کنی؟😑😐"));
-    } elseif (userHasStartedBot($userIdToBlock)) {
-        blockUser($userIdToBlock, $banFile);
-        file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("کاربر $userIdToBlock مسدود گردید✅"));
-    } else {
-        file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("آیدی عددی که وارد کردی اشتباست🤣 دوباره بفرس."));
-    }
-
-    unlink("$dataDir/is_blocking.txt");
 
 } elseif ($callbackData == "unblock_user" && $chatId == $adminId) {
-    file_put_contents("$dataDir/is_unblocking.txt", "1");
     file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("لطفاً آیدی عددی کاربر را ارسال کنید:"));
 
-} elseif (file_exists("$dataDir/is_unblocking.txt") && $chatId == $adminId) {
-    $userIdToUnblock = $message;
-
-    if ($userIdToUnblock == $adminId) {
-        file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("خودت میخوای خودتو بن کنی؟😑😐"));
-    } elseif (!in_array($userIdToUnblock, $blockedUsers)) {
-        file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("این کاربر مسدود نیس😄👈👉"));
-    } elseif (userHasStartedBot($userIdToUnblock)) {
-        unblockUser($userIdToUnblock, $banFile);
-        file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("کاربر $userIdToUnblock آزاد شد✅"));
+} elseif (is_numeric($message) && $chatId == $adminId) {
+    if (in_array($message, $blockedUsers)) {
+        unblockUser($message, $conn);
+        file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("کاربر $message از مسدودی خارج شد."));
     } else {
-        file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("آیدی عددی که وارد کردی اشتباست🤣 دوباره بفرس."));
+        blockUser($message, $conn);
+        file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("کاربر $message مسدود شد."));
     }
-
-    unlink("$dataDir/is_unblocking.txt");
-
-} elseif (in_array($chatId, $blockedUsers)) {
-    exit;
 }
 
-function userHasStartedBot($userId) {
-    global $apiUrl;
-    $response = file_get_contents($apiUrl . "getChat?chat_id=$userId");
-    $data = json_decode($response, TRUE);
-    return isset($data['ok']) && $data['ok'];
-}
+$conn->close();
 ?>
