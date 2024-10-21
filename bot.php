@@ -15,7 +15,6 @@ $chatId = $update['message']['chat']['id'] ?? $update['callback_query']['message
 $message = $update['message']['text'] ?? '';
 $callbackData = $update['callback_query']['data'] ?? '';
 
-// تابع برای دریافت لیست کاربران مسدود شده از دیتابیس
 function getBlockedUsers($conn) {
     $sql = "SELECT chatid FROM black_list";
     $result = $conn->query($sql);
@@ -28,7 +27,6 @@ function getBlockedUsers($conn) {
     return $users;
 }
 
-// تابع برای مسدود کردن کاربر و اضافه کردن به جدول black_list
 function blockUser($userId, $conn) {
     $sql = "INSERT IGNORE INTO black_list (chatid) VALUES (?)";
     $stmt = $conn->prepare($sql);
@@ -37,7 +35,6 @@ function blockUser($userId, $conn) {
     $stmt->close();
 }
 
-// تابع برای رفع مسدودی کاربر از جدول black_list
 function unblockUser($userId, $conn) {
     $sql = "DELETE FROM black_list WHERE chatid = ?";
     $stmt = $conn->prepare($sql);
@@ -52,7 +49,7 @@ if ($message == "/start" && !in_array($chatId, $blockedUsers)) {
     $keyboard = [
         'inline_keyboard' => [
             [['text' => 'دکمه 1', 'callback_data' => 'button1']],
-            [['text' => 'دکمه 2', 'callback_data' => 'button2']],
+            [['text' => '💳شارژ کیف پول', 'callback_data' => 'wallet_charge']],
         ]
     ];
 
@@ -97,6 +94,15 @@ if ($message == "/start" && !in_array($chatId, $blockedUsers)) {
     } else {
         blockUser($message, $conn);
         file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("کاربر $message مسدود شد."));
+    }
+} elseif ($callbackData == "wallet_charge" && !in_array($chatId, $blockedUsers)) {
+    file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("لطفا مبلغ را وارد کنید (بین 5000 تومان تا 5000000 تومان):"));
+
+} elseif (is_numeric($message) && !in_array($chatId, $blockedUsers)) {
+    if ($message >= 5000 && $message <= 5000000) {
+        file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("مبلغ $message تومان با موفقیت ثبت شد."));
+    } else {
+        file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("مبلغ وارد شده معتبر نیست. لطفا عددی بین 5000 تا 5000000 تومان وارد کنید."));
     }
 }
 
