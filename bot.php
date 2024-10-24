@@ -71,6 +71,9 @@ if ($message == "/start" && !in_array($chatId, $blockedUsers)) {
             [
                 ['text' => '❌مسدود کردن کاربر❌', 'callback_data' => 'block_user'],
                 ['text' => '✅رفع مسدودی کاربر✅', 'callback_data' => 'unblock_user']
+            ],
+            [
+                ['text' => 'تنظیمات متن استارت⭐', 'callback_data' => 'vip_settings']
             ]
         ]
     ];
@@ -81,6 +84,9 @@ if ($message == "/start" && !in_array($chatId, $blockedUsers)) {
 
     file_get_contents($apiUrl . "editMessageText?chat_id=$chatId&message_id=$messageId&text=" . urlencode($editText) . "&reply_markup=$replyMarkup");
 
+} elseif ($callbackData == "vip_settings" && $chatId == $adminId) {
+    file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("این قابلیت در ورژن VIP فعال است. برای خرید به آیدی زیر مراجعه نمایید."));
+    
 } elseif ($callbackData == "block_user" && $chatId == $adminId) {
     file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("لطفاً آیدی عددی کاربر را ارسال کنید:"));
 
