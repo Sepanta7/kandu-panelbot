@@ -13,22 +13,6 @@ function ensureSettingExists($conn) {
     $conn->query($sql);
 }
 
-function ensureUserExists($conn, $chatId) {
-    $query = $conn->prepare("SELECT id FROM users WHERE id = ?");
-    $query->bind_param("i", $chatId);
-    $query->execute();
-    $result = $query->get_result();
-
-    if ($result->num_rows === 0) {
-        $insertQuery = $conn->prepare("INSERT INTO users (id, wallet, number) VALUES (?, ?, '')");
-        $walletValue = number_format(0, 0, '.', '');
-        $insertQuery->bind_param("ii", $chatId, $walletValue);
-        $insertQuery->execute();
-        $insertQuery->close();
-    }
-    $query->close();
-}
-
 ensureSettingExists($conn);
 
 $update = file_get_contents("php://input");
@@ -85,8 +69,6 @@ function updateCardOwnerName($newOwnerName, $conn) {
 $blockedUsers = getBlockedUsers($conn);
 
 if ($message == "/start" && !in_array($chatId, $blockedUsers)) {
-    ensureUserExists($conn, $chatId);
-
     $keyboard = [
         'inline_keyboard' => [
             [['text' => 'دکمه 1', 'callback_data' => 'button1']],
@@ -101,6 +83,7 @@ if ($message == "/start" && !in_array($chatId, $blockedUsers)) {
     }
 
     $replyMarkup = json_encode($keyboard);
+
     file_get_contents($apiUrl . "sendMessage?chat_id=$chatId&text=" . urlencode("سلام! خوش اومدی به ربات ما! 😊") . "&reply_markup=$replyMarkup");
 
 } elseif ($callbackData == "admin_panel" && $chatId == $adminId) {
