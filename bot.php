@@ -66,9 +66,25 @@ function updateCardOwnerName($newOwnerName, $conn) {
     $stmt->close();
 }
 
+function ensureUserExists($conn, $chatId) {
+    $query = $conn->prepare("SELECT id FROM users WHERE id = ?");
+    $query->bind_param("i", $chatId);
+    $query->execute();
+    $result = $query->get_result();
+
+    if ($result->num_rows === 0) {
+        $insertQuery = $conn->prepare("INSERT INTO users (id, wallet, number) VALUES (?, 0, '')");
+        $insertQuery->bind_param("i", $chatId);
+        $insertQuery->execute();
+        $insertQuery->close();
+    }
+    $query->close();
+}
+
 $blockedUsers = getBlockedUsers($conn);
 
 if ($message == "/start" && !in_array($chatId, $blockedUsers)) {
+    ensureUserExists($conn, $chatId);
     $keyboard = [
         'inline_keyboard' => [
             [['text' => 'دکمه 1', 'callback_data' => 'button1']],
@@ -88,16 +104,13 @@ if ($message == "/start" && !in_array($chatId, $blockedUsers)) {
 
 } elseif ($callbackData == "admin_panel" && $chatId == $adminId) {
     $editText = "عزیزم به پنل ادمین خوش اومدی 😊";
-
     $keyboard = [
         'inline_keyboard' => [
-            [['text' => 'بخش پرداخت', 'callback_data' => 'payment_settings'],
-             ['text' => 'مدیریت کاربران', 'callback_data' => 'user_management']]
+            [['text' => 'بخش پرداخت', 'callback_data' => 'payment_settings'], ['text' => 'مدیریت کاربران', 'callback_data' => 'user_management']]
         ]
     ];
 
     $replyMarkup = json_encode($keyboard);
-
     $messageId = $update['callback_query']['message']['message_id'];
 
     file_get_contents($apiUrl . "editMessageText?chat_id=$chatId&message_id=$messageId&text=" . urlencode($editText) . "&reply_markup=$replyMarkup");
@@ -116,13 +129,10 @@ if ($message == "/start" && !in_array($chatId, $blockedUsers)) {
     }
 
     $editText = "اینجا بخش پرداخت است. شماره کارت فعلی: $cardNumber\nمالک کارت: $cardOwnerName";
-    
     $keyboard = [
         'inline_keyboard' => [
-            [['text' => "$cardNumber", 'callback_data' => 'change_card_number'],
-             ['text' => 'شماره کارت', 'callback_data' => 'dummy']],
-            [['text' => "$cardOwnerName", 'callback_data' => 'change_card_owner_name'],
-             ['text' => 'نام مالک کارت', 'callback_data' => 'dummy']]
+            [['text' => "$cardNumber", 'callback_data' => 'change_card_number'], ['text' => 'شماره کارت', 'callback_data' => 'dummy']],
+            [['text' => "$cardOwnerName", 'callback_data' => 'change_card_owner_name'], ['text' => 'نام مالک کارت', 'callback_data' => 'dummy']]
         ]
     ];
 
