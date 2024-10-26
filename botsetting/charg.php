@@ -6,8 +6,6 @@ $apiUrl = "https://api.telegram.org/bot$botToken/";    die("اتصال به دی
 
 $update = file_get_contents("php://input");
 $update = json_decode($update, TRUE);
-
-$chatId = $update['message']['chat']['id'] ?? $update['callback_query']['message']['chat']['id'];
 $message = $update['message']['text'] ?? '';
 $callbackData = $update['callback_query']['data'] ?? '';
 
