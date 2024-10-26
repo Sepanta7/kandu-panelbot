@@ -1,11 +1,7 @@
 <?php
 require_once 'baseinfo.php';
 
-$apiUrl = "https://api.telegram.org/bot$botToken/";
-
-$conn = new mysqli($servername, $username, $password, $dbname);
-if ($conn->connect_error) {
-    die("اتصال به دیتابیس با خطا مواجه شد: " . $conn->connect_error);
+$apiUrl = "https://api.telegram.org/bot$botToken/";    die("اتصال به دیتابیس با خطا مواجه شد: " . $conn->connect_error);
 }
 
 $update = file_get_contents("php://input");
