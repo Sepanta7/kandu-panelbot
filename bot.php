@@ -1,13 +1,13 @@
 <?php
-$botToken = "7782070742:AAG6U-Ut5icX9nh174jUehpSagmFzkhc-Xw";
+$botToken = "توکن";
 $apiUrl = "https://api.telegram.org/bot$botToken/";
 
-$adminChatId = "6261222898"; // آیدی چت ادمین
+$adminChatId = ""; // آیدی چت ادمین
 
 $servername = "localhost";
-$username = "sedevir_kandu";
-$password = "HDJ?KTva4]DD";
-$dbname = "sedevir_kandu";
+$username = "یوزرنیم دیتابیس";
+$password = "پسورد دیتابیس";
+$dbname = "نام دیتابیس";
 
 $conn = new mysqli($servername, $username, $password, $dbname);
 
