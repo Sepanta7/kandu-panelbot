@@ -107,4 +107,3 @@ function sendMessage($chatId, $text, $keyboard = null)
     return $responseData['result']['message_id'] ?? null;
 }
 ?>
-<!--  -->
